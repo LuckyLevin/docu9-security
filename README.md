@@ -1,23 +1,27 @@
-# docu9 — öffentlich nachprüfbare Sicherheitsquellen
+# docu9 — öffentlich nachprüfbare Sicherheitsfunktionen
 
-Dieses Repository ist ein **kuratierter Spiegel** aus dem privaten docu9-Monorepo.
+Dieses Repository ist ein **kuratierter Code-Spiegel** aus dem privaten docu9-Monorepo.
 
-Es enthält:
+Es enthält ausschließlich die Sicherheits-Implementierung:
 
-- ausgewählte Architektur-Dokumente zu Verschlüsselung, Tresor, Krypto-Betrieb und Notfallkit
-- die zugehörigen Code-Pfade `backend/app/crypto` und `frontend/lib/vault`
+- `backend/app/crypto` — Server-Krypto (Envelope, KMS, Notfall-Code)
+- `frontend/lib/vault` — Client-Tresor (WebCrypto / Passkey-PRF)
 
-Es enthält **nicht** die vollständige Webanwendung, keine Infrastruktur-Secrets und keine Nutzerdaten.
+Es enthält **nicht**:
+
+- Architektur- oder Prozess-Dokumentation
+- die vollständige Webanwendung
+- Infrastruktur-Secrets oder Nutzerdaten
 
 ## Wie der Spiegel entsteht
 
-1. Quelle der Wahrheit: privates Monorepo (`docs/architecture/…`, Crypto-Pfade)
-2. Allowlist: `docs/public-security/manifest.json`
-3. `infra/scripts/sync-public-security.sh` kopiert die Allowlist nach `frontend/content/public-security` (Website-Build)
-4. `infra/scripts/publish-public-security.sh` veröffentlicht denselben Stand hierher (Deploy)
+1. Quelle der Wahrheit: privates Monorepo (Crypto-/Vault-Pfade)
+2. Allowlist: `docs/public-security/manifest.json` → Abschnitt `codeTrees`
+3. `infra/scripts/sync-public-security.sh` bereitet den Staging-Stand vor
+4. `infra/scripts/publish-public-security.sh` veröffentlicht ihn hierher (Deploy)
 
-Damit stimmen die Texte auf [docu9.de/sicherheit](https://docu9.de/sicherheit) und dieser Spiegel überein.
+Produktbeschreibung und Erläuterungen stehen auf [docu9.de/sicherheit](https://docu9.de/sicherheit) — nicht in diesem Repo.
 
 ## Lizenz / Nutzung
 
-Nur zur Nachprüfung des Sicherheitsmodells. Kein Anspruch auf ein lauffähiges Produkt-Setup.
+Nur zur Nachprüfung der Sicherheitsfunktionen. Kein Anspruch auf ein lauffähiges Produkt-Setup.

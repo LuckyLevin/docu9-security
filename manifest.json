@@ -1,48 +1,11 @@
 {
   "version": 1,
-  "syncedFrom": "docs/public-security/manifest.json",
+  "description": "Kuratierter Code-Spiegel der Sicherheitsfunktionen (kein Entwicklungs-Tagebuch).",
   "publicRepo": {
     "defaultHttps": "https://github.com/LuckyLevin/docu9-security",
     "defaultGitUrl": "git@github.com:LuckyLevin/docu9-security.git"
   },
-  "documents": [
-    {
-      "id": "security",
-      "file": "03-security.md",
-      "title": {
-        "de": "Security-Konzept (Envelope, Isolation, Firewall)",
-        "en": "Security concept (envelope, isolation, firewall)"
-      },
-      "githubPath": "docs/03-security.md"
-    },
-    {
-      "id": "zero-knowledge",
-      "file": "07-zero-knowledge.md",
-      "title": {
-        "de": "Zero-Knowledge & Privater Tresor",
-        "en": "Zero-knowledge & Private Vault"
-      },
-      "githubPath": "docs/07-zero-knowledge.md"
-    },
-    {
-      "id": "runbook-krypto",
-      "file": "08-runbook-krypto.md",
-      "title": {
-        "de": "Krypto-Runbook (Vault, Audit, Backups)",
-        "en": "Crypto runbook (Vault, audit, backups)"
-      },
-      "githubPath": "docs/08-runbook-krypto.md"
-    },
-    {
-      "id": "emergency",
-      "file": "11-emergency-account-lifecycle.md",
-      "title": {
-        "de": "Notfallkit & Konto-Lebenszyklus",
-        "en": "Emergency kit & account lifecycle"
-      },
-      "githubPath": "docs/11-emergency-account-lifecycle.md"
-    }
-  ],
+  "documents": [],
   "codeTrees": [
     {
       "dest": "backend/app/crypto",
@@ -61,5 +24,5 @@
       "githubPath": "frontend/lib/vault"
     }
   ],
-  "contentDigest": "8eb041653aa57b0a7b8c2f3cd847c1e1e45daf62a0ee977c071141752019dc66"
+  "contentDigest": "9a4c883aeccacc84094c5769c607b1d0edb580b15d96af160038fdf8512110cb"
 }
