@@ -26,9 +26,10 @@ export function uploadMimeType(file: File): string {
 
 export function formDataFilePart(file: File): [Blob, string] {
   const mime = uploadMimeType(file);
-  // Safari/WebKit: immer typisierten Blob materialisieren — verhindert
-  // „Load failed“ und abgeschnittene Uploads bei manchen File-Objekten.
-  return [new Blob([file], { type: mime }), file.name];
+  // Kein `new Blob([file])`: auf iOS kopiert das große Mediathek-Fotos in den
+  // Speicher und kann den Upload einfrieren. `slice` setzt nur den MIME-Typ.
+  if (file.type === mime) return [file, file.name];
+  return [file.slice(0, file.size, mime), file.name];
 }
 
 export async function uploadFileToVault(file: File, publicKeyHex: string): Promise<DocumentSummary> {
