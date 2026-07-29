@@ -7,6 +7,7 @@ Prozess-Speicher von `api`/`worker` mehr.
 """
 
 import base64
+import logging
 import os
 import threading
 import time
@@ -16,6 +17,8 @@ import httpx
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from app.config import get_settings
+
+log = logging.getLogger(__name__)
 
 
 class Kms(Protocol):
@@ -93,7 +96,8 @@ class VaultKms:
                 json={"role_id": self._role_id, "secret_id": self._secret_id},
             )
             if resp.status_code != 200:
-                raise KmsError(f"Vault AppRole-Login fehlgeschlagen: {resp.status_code} {resp.text[:200]}")
+                log.debug("Vault AppRole-Login fehlgeschlagen: %s", resp.text[:500])
+                raise KmsError(f"Vault AppRole-Login fehlgeschlagen: {resp.status_code}")
             auth = resp.json()["auth"]
             self._token = auth["client_token"]
             self._token_expiry = time.monotonic() + int(auth.get("lease_duration", 3600))
@@ -110,7 +114,8 @@ class VaultKms:
             f"/v1/{self._mount}/encrypt/{self._key}", json=payload, headers=self._headers()
         )
         if resp.status_code != 200:
-            raise KmsError(f"Vault encrypt fehlgeschlagen: {resp.status_code} {resp.text[:200]}")
+            log.error("Vault encrypt fehlgeschlagen: %s", resp.text[:500])
+            raise KmsError(f"Vault encrypt fehlgeschlagen: {resp.status_code}")
         ciphertext = resp.json()["data"]["ciphertext"]
         return ciphertext.encode("utf-8")
 
@@ -120,7 +125,8 @@ class VaultKms:
             f"/v1/{self._mount}/decrypt/{self._key}", json=payload, headers=self._headers()
         )
         if resp.status_code != 200:
-            raise KmsError(f"Vault decrypt fehlgeschlagen: {resp.status_code} {resp.text[:200]}")
+            log.error("Vault decrypt fehlgeschlagen: %s", resp.text[:500])
+            raise KmsError(f"Vault decrypt fehlgeschlagen: {resp.status_code}")
         return base64.b64decode(resp.json()["data"]["plaintext"])
 
     def rewrap(self, wrapped: bytes) -> bytes:
@@ -134,7 +140,8 @@ class VaultKms:
             f"/v1/{self._mount}/rewrap/{self._key}", json=payload, headers=self._headers()
         )
         if resp.status_code != 200:
-            raise KmsError(f"Vault rewrap fehlgeschlagen: {resp.status_code} {resp.text[:200]}")
+            log.error("Vault rewrap fehlgeschlagen: %s", resp.text[:500])
+            raise KmsError(f"Vault rewrap fehlgeschlagen: {resp.status_code}")
         return resp.json()["data"]["ciphertext"].encode("utf-8")
 
 

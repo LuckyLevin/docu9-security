@@ -1,4 +1,4 @@
-"""X25519-Hilfen für Tresor-Betreiber-Recovery (kompatibel mit Web Crypto im Browser)."""
+"""X25519-Hilfen für Tresor-Betreiber-Recovery (HKDF-Ableitung wie Web Crypto im Browser)."""
 
 from __future__ import annotations
 
@@ -6,18 +6,29 @@ import base64
 
 import os
 
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import load_der_private_key
 
 AAD_VAULT_DEK = b"docu9-vault-dek"
+HKDF_SALT = b"docu9-vault-x25519-v2"
 
 
 def _aes_key_from_shared(shared: bytes) -> bytes:
-    """Web Crypto: X25519 deriveKey → AES-GCM-256 nutzt die rohen 32 Shared-Secret-Bytes."""
+    """Leitet AES-256-GCM per HKDF-SHA256 aus dem X25519-Shared-Secret ab (Frontend-identisch).
+
+    Ältere Wraps ohne HKDF sind damit nicht mehr lesbar.
+    """
     if len(shared) != 32:
         raise ValueError("X25519 shared secret muss 32 Bytes sein.")
-    return shared
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=HKDF_SALT,
+        info=AAD_VAULT_DEK,
+    ).derive(shared)
 
 
 def unwrap_ephemeral_x25519_wrap(wrap_blob: bytes, private_key_raw: bytes) -> bytes:

@@ -4,6 +4,7 @@ const PBKDF2_ITERATIONS = 310_000;
 const AAD_FILE = new TextEncoder().encode("docu9-vault-file");
 const AAD_PAYLOAD = new TextEncoder().encode("docu9-vault-payload");
 const AAD_DEK = new TextEncoder().encode("docu9-vault-dek");
+const HKDF_SALT = new TextEncoder().encode("docu9-vault-x25519-v2");
 
 export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -56,7 +57,7 @@ export async function generateVaultKeyPair(): Promise<{
   publicKeyRaw: Uint8Array;
   privateKeyPkcs8: Uint8Array;
 }> {
-  const keyPair = await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveKey"]);
+  const keyPair = await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveKey", "deriveBits"]);
   const publicKeyRaw = new Uint8Array(await crypto.subtle.exportKey("raw", keyPair.publicKey));
   const privateKeyPkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey));
   return { publicKeyRaw, privateKeyPkcs8 };
@@ -85,7 +86,7 @@ export async function unwrapToPrivateKey(wrapBlobB64: string, secret: string): P
   const ct = raw.slice(28);
   const key = await deriveAesKeyFromPassphrase(secret, salt, ["decrypt"]);
   const pkcs8 = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, key, ct));
-  return crypto.subtle.importKey("pkcs8", pkcs8, { name: "X25519" }, true, ["deriveKey"]);
+  return crypto.subtle.importKey("pkcs8", pkcs8, { name: "X25519" }, true, ["deriveKey", "deriveBits"]);
 }
 
 /** Passkey-PRF: AES-GCM mit rohem 32-Byte-Schlüssel (kein PBKDF2). */
@@ -107,33 +108,33 @@ export async function unwrapBytesWithRawKey(keyBytes: Uint8Array, wrapped: Uint8
 }
 
 export async function importVaultPrivateKey(pkcs8: Uint8Array): Promise<CryptoKey> {
-  return crypto.subtle.importKey("pkcs8", pkcs8, { name: "X25519" }, true, ["deriveKey"]);
+  return crypto.subtle.importKey("pkcs8", pkcs8, { name: "X25519" }, true, ["deriveKey", "deriveBits"]);
 }
 
 async function importPublicKeyRaw(raw: Uint8Array): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", raw, { name: "X25519" }, true, []);
 }
 
-async function deriveAesFromX25519(privateKey: CryptoKey, publicKey: CryptoKey): Promise<CryptoKey> {
+async function deriveAesFromX25519(
+  privateKey: CryptoKey,
+  publicKey: CryptoKey,
+  usages: KeyUsage[],
+): Promise<CryptoKey> {
+  const bits = await crypto.subtle.deriveBits({ name: "X25519", public: publicKey }, privateKey, 256);
+  const hkdfKey = await crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
-    { name: "X25519", public: publicKey },
-    privateKey,
+    { name: "HKDF", hash: "SHA-256", salt: HKDF_SALT, info: AAD_DEK },
+    hkdfKey,
     { name: "AES-GCM", length: 256 },
     false,
-    ["encrypt", "decrypt"],
+    usages,
   );
 }
 
 export async function wrapBytesForPublicKey(data: Uint8Array, publicKeyHex: string): Promise<string> {
   const publicKey = await importPublicKeyRaw(hexToBytes(publicKeyHex));
-  const ephemeral = await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveKey"]);
-  const derived = await crypto.subtle.deriveKey(
-    { name: "X25519", public: publicKey },
-    ephemeral.privateKey,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt"],
-  );
+  const ephemeral = await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveKey", "deriveBits"]);
+  const derived = await deriveAesFromX25519(ephemeral.privateKey, publicKey, ["encrypt"]);
   const nonce = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(
     await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: AAD_DEK }, derived, data),
@@ -152,7 +153,7 @@ export async function unwrapBytes(wrappedB64: string, privateKey: CryptoKey): Pr
   const nonce = raw.slice(32, 44);
   const ct = raw.slice(44);
   const ephKey = await importPublicKeyRaw(ephPub);
-  const derived = await deriveAesFromX25519(privateKey, ephKey);
+  const derived = await deriveAesFromX25519(privateKey, ephKey, ["decrypt"]);
   return new Uint8Array(
     await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: AAD_DEK }, derived, ct),
   );
