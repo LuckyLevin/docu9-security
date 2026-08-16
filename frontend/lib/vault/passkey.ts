@@ -64,7 +64,7 @@ async function runPasskeyPrf(
       allowCredentials: [
         { id: base64UrlToBuffer(loginPasskeyCredentialId), type: "public-key" as const },
       ],
-      extensions: { prf: { eval: { first: prfSalt.buffer } } },
+      extensions: { prf: { eval: { first: prfSalt.buffer as ArrayBuffer } } },
     },
     mediation: "required",
   })) as PublicKeyCredential | null;
@@ -105,17 +105,31 @@ export async function createVaultWrapForLoginPasskey(
   loginPasskeyCredentialId: string,
   privateKeyPkcs8: Uint8Array,
 ): Promise<PasskeyWrap> {
+  return createPasskeyWrapForBytes(loginPasskeyCredentialId, privateKeyPkcs8);
+}
+
+/** Beliebige Bytes mit Login-Passkey-PRF wrappen (Tresor-Privatkey oder Postfach-Creds). */
+export async function createPasskeyWrapForBytes(
+  loginPasskeyCredentialId: string,
+  data: Uint8Array,
+): Promise<PasskeyWrap> {
   if (!isPasskeyPrfAvailable()) throw new Error("WebAuthn nicht verfügbar.");
   const prfSalt = crypto.getRandomValues(new Uint8Array(PRF_SALT_BYTES));
   const prfOutput = await runPasskeyPrf(loginPasskeyCredentialId, prfSalt);
   return {
     credential_id: loginPasskeyCredentialId,
-    wrap_blob_b64: await wrapPrivateKeyWithPrf(privateKeyPkcs8, prfSalt, prfOutput),
+    wrap_blob_b64: await wrapPrivateKeyWithPrf(data, prfSalt, prfOutput),
   };
 }
 
 /** Tresor mit gespeichertem Login-Passkey-Wrap entsperren. */
 export async function unlockPrivateKeyWithPasskeyWraps(wraps: PasskeyWrap[]): Promise<CryptoKey> {
+  const pkcs8 = await unlockBytesWithPasskeyWraps(wraps);
+  return importVaultPrivateKey(pkcs8);
+}
+
+/** Passkey-Wraps → Klartext-Bytes (Postfach-Credentials, Tresor-Key, …). */
+export async function unlockBytesWithPasskeyWraps(wraps: PasskeyWrap[]): Promise<Uint8Array> {
   if (wraps.length === 0) throw new Error("Kein Passkey-Wrap hinterlegt.");
 
   let wrap: PasskeyWrap;
@@ -140,13 +154,12 @@ export async function unlockPrivateKeyWithPasskeyWraps(wraps: PasskeyWrap[]): Pr
     const usedId = bufferToBase64Url(assertion.rawId);
     const found = wraps.find((w) => w.credential_id === usedId);
     if (!found) {
-      throw new Error("Dieser Passkey ist keinem Tresor-Wrap zugeordnet.");
+      throw new Error("Dieser Passkey ist keinem Wrap zugeordnet.");
     }
     wrap = found;
   }
 
   const { prfSalt, encrypted } = parsePasskeyWrapBlob(wrap.wrap_blob_b64);
   const prfOutput = await runPasskeyPrf(wrap.credential_id, prfSalt);
-  const pkcs8 = await unwrapBytesWithRawKey(prfKeyBytes(prfOutput), encrypted);
-  return importVaultPrivateKey(pkcs8);
+  return unwrapBytesWithRawKey(prfKeyBytes(prfOutput), encrypted);
 }
